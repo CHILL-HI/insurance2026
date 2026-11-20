@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#123b36">
+<title>個人保險理賠快速查詢</title>
+<style>
+:root{--ink:#18312d;--muted:#667873;--line:#dce6e2;--bg:#f3f7f5;--card:#fff;--brand:#176b59;--brand2:#e5f3ee;--warn:#fff5df;--warnink:#805500}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif}
+header{background:#123b36;color:#fff;padding:25px 18px 22px}header .wrap,main{max-width:900px;margin:auto}
+h1{font-size:24px;margin:0 0 5px}header p{margin:0;color:#c9ded7;font-size:14px}
+main{padding:18px 14px 40px}.panel,.result{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 3px 12px #163b3210}
+label{font-size:13px;font-weight:700;display:block;margin:0 0 7px}
+input,select{width:100%;font:inherit;border:1px solid #cbd9d3;border-radius:10px;padding:12px;background:#fff;color:var(--ink);min-height:46px}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:12px}.full{grid-column:1/-1}
+.small{font-size:12px;color:var(--muted);line-height:1.6}.count{font-size:13px;color:var(--muted);margin:10px 0}
+.result{padding:15px}.top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.company{font-weight:750}.code{background:#eef3f1;border-radius:7px;padding:4px 8px;font-size:12px;font-weight:700}
+.amount{font-size:22px;font-weight:800;color:var(--brand);margin:10px 0 5px}
+.item{font-weight:700;margin:0 0 8px}.basis{background:#f4f7f6;border-radius:10px;padding:10px;font-size:13px;line-height:1.6}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.tag{font-size:11px;background:var(--brand2);color:#24594d;padding:4px 8px;border-radius:20px}
+.summary{background:#eaf5f0;border:1px solid #cce4d9;border-radius:12px;padding:14px;margin:12px 0}.summary strong{font-size:25px;color:var(--brand)}.sumline{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #cce4d9}.sumline:last-child{border-bottom:0}.sumvalue{font-weight:800;font-variant-numeric:tabular-nums;text-align:right}.sumhint{font-size:12px;color:var(--muted);line-height:1.55;margin-top:8px}
+.warning{background:var(--warn);color:var(--warnink);padding:12px;border-radius:10px;font-size:13px;line-height:1.6}
+button{border:0;border-radius:10px;background:var(--brand);color:#fff;padding:12px 16px;font:inherit;font-weight:700;cursor:pointer}
+button.secondary{background:#edf2ef;color:var(--ink)}.actions{display:flex;gap:8px;margin-top:12px}
+footer{font-size:12px;color:var(--muted);line-height:1.7;padding:8px 2px}
+@media(max-width:560px){.controls{grid-template-columns:1fr}.full{grid-column:auto}h1{font-size:21px}.amount{font-size:20px}}
+</style>
+</head>
+<body>
+<header><div class="wrap"><h1>個人保險理賠快速查詢</h1><p>輸入事故情境，優先查看固定日額；實支實付轉換日額列於備註</p></div></header>
+<main>
+<section class="panel">
+ <div class="controls">
+  <div class="full"><label for="query">事故情境／關鍵字</label><input id="query" placeholder="例如：意外住院5天、癌症確診、骨折、器官移植"></div>
+  <div class="full"><label for="scenario">選擇理賠項目</label><select id="scenario"></select></div>
+  <div><label for="days">住院天數（預設 1 日）</label><input id="days" type="number" min="1" max="365" step="1" value="1"></div>
+  <div><label for="sort">排序方式</label><select id="sort"><option value="company">依保險公司</option><option value="amount">依額度文字</option></select></div>
+ </div>
+ <div class="small" style="margin-top:9px">輸入關鍵字會嘗試辨識情境；也可以直接從下拉選單選擇。</div>
+ <div class="actions"><button id="reset" class="secondary" type="button">清除／重設</button></div>
+</section>
+<div id="output" aria-live="polite"></div>
+<footer>
+<strong>重要提醒：</strong>本工具是依使用者提供的保險項目 PDF 建立的個人查詢輔助，不是保險公司核賠結果。住院日額查詢會分別加總固定日額與實支實付住院上限；轉換日額只列備註，不重複納入加總。已依最新對照表排除劃線刪除的W12、W13、W15、W17。表列保額、限額、日額不可直接視為實際可領金額；實際給付仍須核對正式保單條款、事故原因、等待期、除外責任、收據與其他保險給付規定。資料未列明者會顯示「未找到明確額度」，不自行推定。
+</footer>
+</main>
+<script>
+const scenarios = [
+"意外住院/日","疾病住院/日","癌症住院/日","意外限額實支實付","住院實支實付上限","住院手術實支實付上限",
+"完全骨折未住院","重大燒燙傷","重大疾病一次給付","特定傷病一次給付","癌症一次給付","意外失能保額","疾病失能保額",
+"意外身故","疾病身故","大眾運輸事故身亡","重大器官移植手術","電梯特定傷害事故","一氧化碳中毒","食物中毒慰問金",
+"意外門診手術醫療保險金","看護費用保險金","傷害保險顏面整形","家庭成員意外責任險","第三人慰問金"
+];
+const records = [
+["意外住院/日","富邦","E","AHI 意外日額","2,000元／日","意外住院日額；骨折未住院依表 × 1/2；意外門診手術2,000元／次"],
+["意外住院/日","富邦","W16","住院醫療保險日額給付","1,500元／日","最多90日；PDF列示為住院醫療日額給付"],
+["意外住院/日","富邦","W9","個人傷害住院安心療養","700元／日","最多90日"],
+["意外住院/日","富邦","B","NHR 住院實支實付－住院上限","2,640元／日","實支實付每日上限；備註：轉換日額2,145元／日，不當作固定日額"],
+["意外住院/日","全球","G","XHR 住院實支實付－住院上限","2,000元／日","實支實付每日上限；備註：轉換日額1,120元／日，不當作固定日額"],
+["意外住院/日","三商","J","SHSR 住院實支實付－住院上限","500元／日","實支實付每日上限；備註：轉換日額500元／日，不當作固定日額"],
+["意外住院/日","富邦","W20","住院生活補助金","5,000元／次","另作提示：住院3日以上給付；屬單次補助，不計入每日合計"],
+["疾病住院/日","富邦","B","NHR 住院實支實付－住院上限","2,640元／日","實支實付每日上限；備註：轉換日額2,145元／日，不當作固定日額"],
+["疾病住院/日","全球","G","XHR 住院實支實付－住院上限","2,000元／日","PDF列示住院上限2,000元／日；備註：轉換日額1,120元／日（非固定住院日額）"],
+["疾病住院/日","三商","J","SHSR 住院實支實付－住院上限","500元／日","PDF列示住院上限500元／日；備註：轉換日額500元／日（非固定住院日額）"],
+["疾病住院/日","法巴","M","定期重大疾病－住院補助","1,000元／日","PDF列示住院1,000元／日；須依該保單給付條件確認是否適用本次疾病"],
+["癌症住院/日","富邦","B","NHR 住院實支實付－住院上限","2,640元／日","實支實付每日上限；備註：轉換日額2,145元／日，不當作固定日額"],
+["癌症住院/日","全球","G","XHR 住院實支實付－住院上限","2,000元／日","實支實付每日上限；備註：轉換日額1,120元／日，不當作固定日額"],
+["癌症住院/日","三商","J","SHSR 住院實支實付－住院上限","500元／日","實支實付每日上限；備註：轉換日額500元／日，不當作固定日額"],
+["癌症住院/日","法巴","M","定期重大疾病－住院補助","1,000元／日","PDF列示一般住院補助，未標示為癌症專屬日額；癌症住院是否符合條件須核對條款"],
+["意外限額實支實付","富邦","D","NMR 意外實支實付","最高30,000元","意外造成就醫，花多少給多少"],
+["意外限額實支實付","富邦","W21","實支實付傷害醫療","最高50,000元","傷害醫療實支實付"],
+["住院實支實付上限","富邦","B","NHR 住院雜費","132,000元／每30天","15單位；條款列舉式"],
+["住院實支實付上限","全球","G","XHR 住院雜費","70,000元／每30天","計劃四"],
+["住院實支實付上限","三商","J","SHSR 住院雜費","100,000元／每30天","A計畫"],
+["住院手術實支實付上限","富邦","B","NHR 住院手術","最高82,500元 × 手術別","依手術項目及保單手術倍數計算"],
+["住院手術實支實付上限","全球","G","XHR 住院手術","最高45,000元 × 手術別","依手術項目及保單手術倍數計算"],
+["住院手術實支實付上限","三商","J","SHSR 住院手術","最高25,000元 × 手術別","依手術項目及保單手術倍數計算"],
+["完全骨折未住院","富邦","E","AHI 意外日額－骨折給付","最高60,000元（依骨折表）","依骨折項目日額 × 60日 × 1/2計算；實際金額依骨折表及條款"],
+["完全骨折未住院","富邦","W21","實支實付傷害醫療","最高50,000元","另有意外醫療實支實付額度；須有符合條款的實際醫療費用，不是骨折定額給付"],
+["重大燒燙傷","富邦","W8","特定燒燙傷給付（6至11級）","300萬元","依PDF所列特定燒燙傷給付"],
+["重大燒燙傷","富邦","X2","五大特定傷病－嚴重第三度燒燙傷","80萬元","意外造成第三度燒燙傷，面積達全身20%以上並經醫師確診"],
+["重大燒燙傷","富邦","W19","燒燙傷病房保險金（備註）","4,000元／日","附帶提示：燒燙傷病房日額，最多90日；不計入W8＋X2的一次給付合計"],
+["重大燒燙傷","法巴","M","燒燙傷病房補助（備註）","2,000元／日","附帶提示：燒燙傷病房日額；不計入W8＋X2的一次給付合計"],
+["重大疾病一次給付","法巴","M","定期重大疾病","100萬元","PDF列示七項重大疾病一次給付，包含重度癌症、重度急性心肌梗塞、冠狀動脈繞道手術、末期腎病變、重度腦中風後障礙、重度癱瘓、重大器官移植或造血幹細胞移植"],
+["重大疾病一次給付","台灣人壽","V","5年定期123重大疾病","保額120萬元","PDF列示重大疾病及大眾運輸意外傷害按表核付；重度癌症或腦中風後殘障按保額2倍給付"],
+["重大疾病一次給付","富邦","X1","七大重大疾病保險金","80萬元","PDF列示七項重大疾病一次給付，依各疾病定義及條款"],
+["特定傷病一次給付","富邦","X2","五大特定傷病保險金","80萬元","心臟瓣膜開心手術、主動脈外科置換、腦血管動脈瘤開顱手術、嚴重頭部創傷、嚴重第三度燒燙傷"],
+["癌症一次給付","安聯","U","CR 一次給付癌症險","100萬元","癌症一次給付；原位癌15萬元"],
+["癌症一次給付","法巴","M","定期重大疾病－重度癌症","100萬元","七項重大疾病之一；PDF註明部分癌症不賠，須核對條款"],
+["癌症一次給付","台灣人壽","V","5年定期123重大疾病","保額120萬元；重度癌症特定情形2倍","PDF列示癌症有理賠；此處基本保額120萬元，重度癌症依條款可能按2倍給付"],
+["癌症一次給付","富邦","X1","七大重大疾病保險金－重度癌症","80萬元","列入癌症一次給付合計；須符合重度癌症定義及條款，部分早期或低風險癌症不在範圍"],
+["意外失能保額","富邦","C","MADD 意外險","30萬元","列入一般意外失能保額；依11級75項及失能比例表核付"],
+["意外失能保額","友邦","L","YRDR 殘廢保障附約","500萬元","疾病或意外致11級75項殘廢，依比例一次給付"],
+["意外失能保額","安聯","T","DR 殘廢給付附約","100萬元","疾病或意外導致11級75項殘廢，依比例一次給付"],
+["意外失能保額","富邦","W","身故及失能","300萬元","列入一般意外失能保額；實際失能給付依條款"],
+["意外失能保額","富邦","W7","失能生活補助金（提示）","最高200萬元","另作提示標籤：限1至3級失能生活補助，不併入一般失能一次給付基本保額"],
+["意外失能保額","台灣人壽","V","重大疾病／大眾運輸意外（提示）","保額120萬元","提示標籤，不納入一般意外失能合計；僅依重大疾病或大眾運輸意外相關條件判斷"],
+["意外失能保額","富邦","X2","五大特定傷病（提示）","80萬元","提示標籤，不納入一般意外失能合計；嚴重頭部創傷或嚴重燒燙傷須符合特定傷病定義"],
+["疾病失能保額","友邦","L","YRDR 殘廢保障附約","500萬元","疾病或意外致11級75項殘廢，依比例一次給付"],
+["疾病失能保額","安聯","T","DR 殘廢給付附約","100萬元","疾病或意外導致11級75項殘廢，依比例一次給付"],
+["疾病失能保額","富邦","X4","完全失能保險金","80萬元","依PDF列示完全失能程度表及相關認定條件；依此採用X4，不以X2特定傷病取代"],
+["意外身故","富邦","A","XWO 終身壽險","10萬元","壽險身故保障；意外身故仍須依契約條款認定"],
+["意外身故","富邦","C","MADD 意外險","30萬元","依使用者指定保留；實際意外身故給付仍須核對MADD條款"],
+["意外身故","全球","F","QWH 終身壽險主約","10萬元","壽險身故保障；意外身故仍須依契約條款認定"],
+["意外身故","三商","I","XWL 15年終壽","10萬元","壽險身故保障；意外身故仍須依契約條款認定"],
+["意外身故","友邦","K","20年終身壽險","100萬元","壽險身故保障；意外身故仍須依契約條款認定"],
+["意外身故","安聯","S","TN0 20年定期壽險","100萬元","壽險身故保障；意外身故仍須依契約條款認定"],
+["意外身故","富邦","W","身故及失能","300萬元","意外身故保障；依契約條款認定。V不列入一般意外身故合計"],
+["疾病身故","富邦","A","XWO 終身壽險","10萬元","身故全殘保額"],
+["疾病身故","全球","F","QWH 終身壽險主約","10萬元","身故全殘保額"],
+["疾病身故","全球","H","TR 30年定期壽險","100萬元","依使用者指定納入疾病身故查詢；此處不區分首年，實際有效期間及續保條件仍須核對"],
+["疾病身故","三商","I","XWL 15年終壽","10萬元","身故全殘保額"],
+["疾病身故","友邦","K","20年終身壽險","100萬元","身故全殘保額；PDF註明為附約提供保障的主約"],
+["疾病身故","安聯","S","TN0 20年定期壽險","100萬元","身故全殘保額；PDF註明為附約提供保障的主約"],
+["疾病身故","富邦","X3","身故保險金或喪葬費用","80萬元","PDF列示身故保險金或喪葬費用"],
+["大眾運輸事故身亡","台灣人壽","V","5年定期123重大疾病－大眾運輸意外","120萬元（依表）","依PDF列示納入大眾運輸事故身亡；依事故後180日內死亡等條件及給付表核定"],
+["大眾運輸事故身亡","富邦","W1","搭乘大眾運輸增額保險","800萬元","大眾運輸事故增額；V＋W1名目合計920萬元，是否可併領依條款核定"],
+["大眾運輸事故身亡","富邦","W","身故及失能（提示）","300萬元","提示標籤：另有W基本身故／失能保額；是否可與W1增額合併及如何計算，須核對條款，不納入920萬元合計"],
+["重大器官移植手術","法巴","M","定期重大疾病－重大器官移植","100萬元","重大器官移植或造血幹細胞移植，屬PDF列示七項重大疾病之一"],
+["重大器官移植手術","富邦","X1","七大重大疾病保險金","80萬元","重大器官移植或造血幹細胞移植"],
+["電梯特定傷害事故","富邦","W3","電梯特定傷害事故","300萬元","PDF列示電梯特定傷害事故增額"],
+["一氧化碳中毒","富邦","W4","一氧化碳中毒","300萬元","PDF列示一氧化碳中毒特定事故增額"],
+["意外門診手術醫療保險金","富邦","E","AHI 意外日額－門診手術","2,000元／次","意外門診手術定額給付"],
+["意外門診手術醫療保險金","富邦","W22","傷害門診手術定額給付","2,000元／次","PDF列示傷害門診手術定額給付"],
+["意外門診手術醫療保險金","全球","G","XHR 門診手術含雜費（備註）","最高2,000元","另作備註：疾病或意外造成之門診手術含雜費實支上限；不納入PDF所列E＋W22的4,000元定額合計"],
+["傷害保險顏面整形","富邦","W10","傷害保險顏面整形費用","300萬元","頭、臉、頸部治療後遺存顯著醜型"],
+["家庭成員意外責任險","富邦","W14","家庭成員意外責任險","50萬元","PDF列示家庭成員意外責任保障"],
+/* W15 已在使用者提供的理賠金額表中劃線刪除，不列入保障資料 */
+].map(x=>({scenario:x[0],company:x[1],code:x[2],item:x[3],amount:x[4],basis:x[5]}));
+
+const keywordRules = [
+[["意外住院","車禍住院"],"意外住院/日"],[["疾病住院","生病住院"],"疾病住院/日"],[["癌症住院"],"癌症住院/日"],
+[["意外實支","意外醫療"],"意外限額實支實付"],[["住院雜費","住院實支"],"住院實支實付上限"],[["手術實支","住院手術"],"住院手術實支實付上限"],
+[["骨折"],"完全骨折未住院"],[["燒燙傷","燒傷"],"重大燒燙傷"],[["重大疾病","心肌梗塞","腦中風"],"重大疾病一次給付"],
+[["特定傷病"],"特定傷病一次給付"],[["癌症確診","癌症一次","罹癌"],"癌症一次給付"],[["意外失能"],"意外失能保額"],
+[["疾病失能"],"疾病失能保額"],[["意外身故","意外死亡"],"意外身故"],[["疾病身故"],"疾病身故"],
+[["大眾運輸","交通工具身亡"],"大眾運輸事故身亡"],[["器官移植"],"重大器官移植手術"],[["電梯"],"電梯特定傷害事故"],
+[["一氧化碳"],"一氧化碳中毒"],[["食物中毒"],"食物中毒慰問金"],[["門診手術"],"意外門診手術醫療保險金"],
+[["看護","照護費"],"看護費用保險金"],[["顏面整形","臉部整形"],"傷害保險顏面整形"],
+[["家庭成員意外責任"],"家庭成員意外責任險"],[["第三人慰問"],"第三人慰問金"]
+];
+
+const $=id=>document.getElementById(id);
+// 富邦依保單代碼區分出單／投保來源，避免所有富邦項目混在一起。
+function displayCompany(r){
+ if(r.company!=="富邦") return r.company;
+ if(["A","B","C","D","E"].includes(r.code)) return "富邦（錠律保經）";
+ if(/^W(?:\d+)?$/.test(r.code)) return "富邦（十全大補）";
+ if(/^X[1-4]$/.test(r.code)) return "富邦（丰采人生重大疾病）";
+ return r.company;
+}
+const scenarioSelect=$("scenario");
+scenarios.forEach(s=>{const o=document.createElement("option");o.value=s;o.textContent=s;scenarioSelect.appendChild(o)});
+function chooseScenario(){
+ const q=$("query").value.trim();
+ const found=keywordRules.find(([keys])=>keys.some(k=>q.includes(k)));
+ if(found) scenarioSelect.value=found[1];
+ render();
+}
+// 各情境可加總的名目額度。提示／備註項目不納入；實支實付另標示為費用上限。
+const sumConfigs = {
+ "意外限額實支實付": {total:80000, title:"意外醫療實支實付名目上限合計", lines:[["D＋W21 實支實付上限",80000]], note:"此為不同保單的費用補償上限名目合計，不代表可直接領取現金；須有符合條款的實際醫療費用，且是否可併用依各保單及收據規定核定。"},
+ "住院實支實付上限": {total:302000, title:"住院雜費名目上限合計（每30天）", lines:[["B＋G＋J 雜費上限",302000]], note:"各保單的實支實付限額不等於可領現金，且可能涉及收據、給付範圍及副本理賠等限制；不可假設三張保單必定全額併領。"},
+ "住院手術實支實付上限": {total:152500, title:"住院手術基礎額度合計", lines:[["B＋G＋J 手術基礎額度",152500]], suffix:" × 各保單手術別／倍數", note:"此處只加總PDF列示的基礎額度；各保單手術表、手術倍數及給付上限不同，不能視為每一手術均可領取此總額。"},
+ "完全骨折未住院": {total:110000, title:"名目額度合計（定額與實支分列）", lines:[["E 骨折定額給付最高額",60000],["W21 意外醫療實支上限",50000]], note:"E依骨折表及日額計算；W21是實際醫療費用補償上限，不是骨折定額。兩者性質不同，合計僅供額度總覽，不代表確定可領11萬元。"},
+ "重大燒燙傷": {total:3800000, title:"一次給付名目合計", lines:[["W8＋X2 一次給付",3800000]], note:"W19及法巴M燒燙傷病房日額屬住院日額備註，不納入此一次給付合計；各項均須符合各自燒燙傷級別及定義。"},
+ "重大疾病一次給付": {total:3000000, title:"重大疾病一次給付名目合計", lines:[["M＋V＋X1",3000000]], note:"依各保單疾病定義、嚴重程度、等待期及給付條件核定；V的重度癌症或腦中風後殘障可能有倍數給付，未把倍數情境預先加進本合計。"},
+ "特定傷病一次給付": {total:800000, title:"特定傷病一次給付名目合計", lines:[["X2",800000]], note:"須符合PDF列示五大特定傷病及正式條款定義。"},
+ "癌症一次給付": {total:4000000, title:"癌症一次給付名目合計", lines:[["U＋M＋V＋X1",4000000]], note:"以各項基本名目額度加總；原位癌、重度癌症倍數及部分癌症除外條款，均依各保單條款另行判定。"},
+ "意外失能保額": {total:9300000, title:"一般意外失能基本保額合計", lines:[["C＋L＋T＋W",9300000]], note:"依各保單11級75項失能比例表核付；W7生活補助、V及X2提示項目不納入本合計。"},
+ "疾病失能保額": {total:6800000, title:"疾病失能名目保額合計", lines:[["L＋T＋X4",6800000]], note:"實際給付依失能等級、比例及各保單條款；X2特定傷病不納入一般疾病失能合計。"},
+ "意外身故": {total:4300000, title:"意外身故名目保額合計（有效保單項目）", lines:[["C＋W＋S",4300000]], note:"A、F、I、K已於首年後解約，雖保留原資料列供辨識，但不納入現行保障合計；其餘仍須依事故原因及各保單有效狀態核定。"},
+ "疾病身故": {total:2800000, title:"疾病身故名目保額合計（有效保單項目）", lines:[["H＋S＋X3",2800000]], note:"A、F、I、K已於首年後解約，雖保留原資料列供辨識，但不納入現行保障合計；其餘仍須確認保單有效期間及身故給付條款。"},
+ "大眾運輸事故身亡": {total:9200000, title:"大眾運輸事故身亡名目合計", lines:[["V＋W1",9200000]], note:"W基本身故／失能300萬元只作提示，不納入此合計；V與W1是否可併領仍依事故定義及條款核定。"},
+ "重大器官移植手術": {total:1800000, title:"重大器官移植一次給付名目合計", lines:[["M＋X1",1800000]], note:"須符合各保單對重大器官移植或造血幹細胞移植的定義及條款。"},
+ "電梯特定傷害事故": {total:3000000, title:"電梯特定傷害事故名目保額", lines:[["W3",3000000]], note:"須符合保單所定電梯特定傷害事故範圍。"},
+ "一氧化碳中毒": {total:3000000, title:"一氧化碳中毒名目保額", lines:[["W4",3000000]], note:"須符合保單所定一氧化碳中毒事故及認定條件。"},
+ "意外門診手術醫療保險金": {total:4000, title:"意外門診手術定額給付合計", lines:[["E＋W22",4000]], note:"全球G的2,000元為門診手術含雜費實支上限，僅列備註，不納入此定額合計。"},
+ "傷害保險顏面整形": {total:3000000, title:"顏面整形費用名目保額", lines:[["W10",3000000]], note:"須符合頭、臉、頸部治療後遺存顯著醜型及正式條款認定。"},
+ "家庭成員意外責任險": {total:500000, title:"家庭成員意外責任名目保額", lines:[["W14",500000]], note:"責任險須先符合承保責任、事故及理賠條件，並非事故發生即定額給付。"}
+};
+const money = n => Math.round(n).toLocaleString("zh-TW") + " 元";
+function appendSummary(out, cfg){
+ const summary=document.createElement("section");summary.className="summary";
+ const heading=document.createElement("div");heading.innerHTML=`<strong>${money(cfg.total)}</strong> <span>${cfg.title}</span>`;summary.appendChild(heading);
+ cfg.lines.forEach(([label,value])=>{const line=document.createElement("div");line.className="sumline";line.innerHTML=`<span>${label}</span><span class="sumvalue">${money(value)}</span>`;summary.appendChild(line)});
+ if(cfg.suffix){const suffix=document.createElement("div");suffix.className="sumhint";suffix.textContent=cfg.suffix;summary.appendChild(suffix)}
+ const hint=document.createElement("div");hint.className="sumhint";hint.textContent=cfg.note;summary.appendChild(hint);out.appendChild(summary);
+}
+function isTerminatedDeathRow(r, scenario){return (scenario==="意外身故"||scenario==="疾病身故") && ["A","F","I","K"].includes(r.code)}
+function render(){
+ const selected=scenarioSelect.value;
+ let rows=records.filter(r=>r.scenario===selected);
+ if(selected.includes("住院/日")) rows.sort((a,b)=>{
+  const aConverted=a.item.includes("住院上限"), bConverted=b.item.includes("住院上限");
+  if(aConverted!==bConverted) return aConverted?1:-1;
+  return a.company.localeCompare(b.company,"zh-Hant")||a.code.localeCompare(b.code);
+ });
+ else if($("sort").value==="company") rows.sort((a,b)=>a.company.localeCompare(b.company,"zh-Hant")||a.code.localeCompare(b.code));
+ const out=$("output");out.innerHTML="";
+ const count=document.createElement("div");count.className="count";count.textContent=`${selected}｜找到 ${rows.length} 筆保障資料`;out.appendChild(count);
+ if(rows.length && selected.includes("住院/日")){
+  const days=Math.max(1,Math.min(365,parseInt($("days").value,10)||1));
+  const dailyRows=rows.filter(r=>r.amount.includes("元／日"));
+  const fixedRows=dailyRows.filter(r=>!r.item.includes("住院上限"));
+  const reimbursementRows=dailyRows.filter(r=>r.item.includes("住院上限"));
+  const getDaily=r=>{const m=r.amount.replace(/,/g,"").match(/([0-9]+(?:\.[0-9]+)?)/);return m?Number(m[1]):0};
+  const fixedPerDay=fixedRows.reduce((sum,r)=>sum+getDaily(r),0);
+  const reimbPerDay=reimbursementRows.reduce((sum,r)=>sum+getDaily(r),0);
+  const totalPerDay=fixedPerDay+reimbPerDay;
+  const money=n=>Math.round(n).toLocaleString("zh-TW")+" 元";
+  const summary=document.createElement("section");summary.className="summary";
+  const heading=document.createElement("div");heading.innerHTML=`<strong>${money(totalPerDay*days)}</strong> <span>／${days} 日的名目額度合計</span>`;summary.appendChild(heading);
+  const line1=document.createElement("div");line1.className="sumline";line1.innerHTML=`<span>固定／定額住院日額（${money(fixedPerDay)}／日）</span><span class="sumvalue">${money(fixedPerDay*days)}</span>`;summary.appendChild(line1);
+  const line2=document.createElement("div");line2.className="sumline";line2.innerHTML=`<span>實支實付住院上限（${money(reimbPerDay)}／日）</span><span class="sumvalue">${money(reimbPerDay*days)}</span>`;summary.appendChild(line2);
+  const hint=document.createElement("div");hint.className="sumhint";hint.textContent="計算方式：固定日額與實支實付每日上限分開統計，再呈現名目額度合計；實支實付上限不是固定現金給付，實際理賠依實際支出、條款及各保單限額核定。各保單是否可同時申請，仍須依條款確認。轉換日額僅列在個別保單備註，不重複加總。";summary.appendChild(hint);
+  out.appendChild(summary);
+ } else if(rows.length && sumConfigs[selected]) {
+  appendSummary(out,sumConfigs[selected]);
+ }
+ if(rows.length){
+  rows.forEach(r=>{
+   const card=document.createElement("article");card.className="result";
+   const top=document.createElement("div");top.className="top";
+   const company=document.createElement("div");company.className="company";company.textContent=displayCompany(r);
+   const code=document.createElement("span");code.className="code";code.textContent=`保單代號 ${r.code}`;
+   top.append(company,code);
+   const amount=document.createElement("div");amount.className="amount";amount.textContent=r.amount;
+   const item=document.createElement("p");item.className="item";item.textContent=`理賠項目：${r.item}`;
+   const basis=document.createElement("div");basis.className="basis";basis.textContent=`理賠依據／給付條件：${r.basis}`;
+   card.append(top,amount,item,basis);
+   if(isTerminatedDeathRow(r,selected)){
+    const tag=document.createElement("div");tag.className="tags";
+    const pill=document.createElement("span");pill.className="tag";pill.textContent="已於首年後解約，不納入身故合計";tag.appendChild(pill);card.appendChild(tag);
+   } else if(r.basis.includes("提示標籤")||r.item.includes("（提示）")||r.item.includes("（備註）")){
+    const tag=document.createElement("div");tag.className="tags";
+    const pill=document.createElement("span");pill.className="tag";pill.textContent="提示／備註，不納入主項合計";tag.appendChild(pill);card.appendChild(tag);
+   }
+   out.appendChild(card);
+  });
+ }else{
+  const box=document.createElement("div");box.className="warning";
+  box.textContent=(selected==="食物中毒慰問金"||selected==="看護費用保險金")
+   ?"目前提供的 PDF 未找到此項目的明確保障名稱或額度，請再確認是否有其他保單或附約資料。"
+   :"目前提供的 PDF 未找到此情境可直接對應的明確額度；請核對正式保單條款，不自行推定有理賠。";
+  out.appendChild(box);
+ }
+}
+$("query").addEventListener("input",chooseScenario);
+scenarioSelect.addEventListener("change",()=>{$("query").value="";render()});
+
+$("sort").addEventListener("change",render);
+$("days").addEventListener("input",render);
+$("reset").addEventListener("click",()=>{$("query").value="";scenarioSelect.value=scenarios[0];$("sort").value="company";$("days").value="1";render()});
+render();
+</script>
+</body>
+</html>
